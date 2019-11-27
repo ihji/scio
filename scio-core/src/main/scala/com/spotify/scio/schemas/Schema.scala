@@ -16,13 +16,14 @@
  */
 package com.spotify.scio.schemas
 
+import java.util
 import java.util.{List => jList, Map => jMap}
 
-import com.spotify.scio.{FeatureFlag, MacroSettings}
+import com.spotify.scio.{FeatureFlag, IsJavaBean, MacroSettings}
 import com.spotify.scio.schemas.instances.AllInstances
 import com.spotify.scio.util.ScioUtil
 import org.apache.beam.sdk.schemas.Schema.FieldType
-import org.apache.beam.sdk.schemas.{SchemaProvider, Schema => BSchema}
+import org.apache.beam.sdk.schemas.{JavaBeanSchema, SchemaProvider, Schema => BSchema}
 import org.apache.beam.sdk.transforms.SerializableFunction
 import org.apache.beam.sdk.values.{Row, TypeDescriptor}
 
@@ -30,6 +31,8 @@ import scala.collection.JavaConverters._
 import scala.reflect.ClassTag
 import org.apache.beam.sdk.values.TupleTag
 import org.apache.beam.sdk.schemas.Schema.LogicalType
+
+import scala.collection.{mutable, SortedSet}
 
 object Schema extends AllInstances {
   @inline final def apply[T](implicit c: Schema[T]): Schema[T] = c
@@ -48,6 +51,141 @@ object Schema extends AllInstances {
         s"LogicalType($className, ${underlying.fieldType.getTypeName()})"
     }))
   }
+
+  implicit val stringSchema: Type[String] =
+    Type[String](FieldType.STRING)
+
+  implicit val byteSchema: Type[Byte] =
+    Type[Byte](FieldType.BYTE)
+
+  implicit val bytesSchema: Type[Array[Byte]] =
+    Type[Array[Byte]](FieldType.BYTES)
+
+  implicit val sortSchema: Type[Short] =
+    Type[Short](FieldType.INT16)
+
+  implicit val intSchema: Type[Int] =
+    Type[Int](FieldType.INT32)
+
+  implicit val longSchema: Type[Long] =
+    Type[Long](FieldType.INT64)
+
+  implicit val floatSchema: Type[Float] =
+    Type[Float](FieldType.FLOAT)
+
+  implicit val doubleSchema: Type[Double] =
+    Type[Double](FieldType.DOUBLE)
+
+  implicit val bigDecimalSchema: Type[BigDecimal] =
+    Type[BigDecimal](FieldType.DECIMAL)
+
+  implicit val booleanSchema: Type[Boolean] =
+    Type[Boolean](FieldType.BOOLEAN)
+
+  implicit def optionSchema[T](implicit s: Schema[T]): Schema[Option[T]] =
+    OptionType(s)
+
+  implicit def arraySchema[T: ClassTag](implicit s: Schema[T]): Schema[Array[T]] =
+    ArrayType(s, _.toList.asJava, _.asScala.toArray)
+
+  implicit def listSchema[T](implicit s: Schema[T]): Schema[List[T]] =
+    ArrayType(s, _.asJava, _.asScala.toList)
+
+  implicit def seqSchema[T](implicit s: Schema[T]): Schema[Seq[T]] =
+    ArrayType(s, _.asJava, _.asScala.toList)
+
+  implicit def traversableOnceSchema[T](implicit s: Schema[T]): Schema[TraversableOnce[T]] =
+    ArrayType(s, _.toList.asJava, _.asScala.toList)
+
+  implicit def iterableSchema[T](implicit s: Schema[T]): Schema[Iterable[T]] =
+    ArrayType(s, _.toList.asJava, _.asScala.toList)
+
+  implicit def arrayBufferSchema[T](implicit s: Schema[T]): Schema[mutable.ArrayBuffer[T]] =
+    ArrayType(s, _.toList.asJava, xs => mutable.ArrayBuffer(xs.asScala: _*))
+
+  implicit def bufferSchema[T](implicit s: Schema[T]): Schema[mutable.Buffer[T]] =
+    ArrayType(s, _.toList.asJava, xs => mutable.Buffer(xs.asScala: _*))
+
+  implicit def setSchema[T](implicit s: Schema[T]): Schema[Set[T]] =
+    ArrayType(s, _.toList.asJava, _.asScala.toSet)
+
+  implicit def mutableSetSchema[T](implicit s: Schema[T]): Schema[mutable.Set[T]] =
+    ArrayType(s, _.toList.asJava, xs => mutable.Set(xs.asScala: _*))
+
+  implicit def sortedSetSchema[T: Ordering](implicit s: Schema[T]): Schema[SortedSet[T]] =
+    ArrayType(s, _.toList.asJava, xs => SortedSet(xs.asScala: _*))
+
+  implicit def listBufferSchema[T](implicit s: Schema[T]): Schema[mutable.ListBuffer[T]] =
+    ArrayType(s, _.toList.asJava, xs => mutable.ListBuffer.apply(xs.asScala: _*))
+
+  implicit def vectorSchema[T](implicit s: Schema[T]): Schema[Vector[T]] =
+    ArrayType(s, _.toList.asJava, _.asScala.toVector)
+
+  implicit def mapSchema[K, V](implicit k: Schema[K], v: Schema[V]): Schema[Map[K, V]] =
+    MapType(k, v, _.asJava, _.asScala.toMap)
+
+  // TODO: WrappedArray ?
+
+  implicit def mutableMapSchema[K, V](
+    implicit k: Schema[K],
+    v: Schema[V]
+  ): Schema[mutable.Map[K, V]] =
+    MapType(k, v, _.asJava, _.asScala)
+
+  implicit val jByteSchema: Type[java.lang.Byte] =
+    Type[java.lang.Byte](FieldType.BYTE)
+
+  implicit val jBytesSchema: Type[Array[java.lang.Byte]] =
+    Type[Array[java.lang.Byte]](FieldType.BYTES)
+
+  implicit val jShortSchema: Type[java.lang.Short] =
+    Type[java.lang.Short](FieldType.INT16)
+
+  implicit val jIntegerSchema: Type[java.lang.Integer] =
+    Type[java.lang.Integer](FieldType.INT32)
+
+  implicit val jLongSchema: Type[java.lang.Long] =
+    Type[java.lang.Long](FieldType.INT64)
+
+  implicit val jFloatSchema: Type[java.lang.Float] =
+    Type[java.lang.Float](FieldType.FLOAT)
+
+  implicit val jDoubleSchema: Type[java.lang.Double] =
+    Type[java.lang.Double](FieldType.DOUBLE)
+
+  implicit val jBigDecimalSchema: Type[java.math.BigDecimal] =
+    Type[java.math.BigDecimal](FieldType.DECIMAL)
+
+  implicit val jBooleanSchema: Type[java.lang.Boolean] =
+    Type[java.lang.Boolean](FieldType.BOOLEAN)
+
+  implicit def jListSchema[T](implicit s: Schema[T]): Schema[java.util.List[T]] =
+    ArrayType(s, identity, identity)
+
+  implicit def jArrayListSchema[T](implicit s: Schema[T]): Schema[java.util.ArrayList[T]] =
+    ArrayType(s, identity, l => new util.ArrayList[T](l))
+
+  implicit def jMapSchema[K, V](
+    implicit ks: Schema[K],
+    vs: Schema[V]
+  ): Schema[java.util.Map[K, V]] =
+    MapType(ks, vs, identity, identity)
+
+  implicit def javaBeanSchema[T: IsJavaBean: ClassTag]: RawRecord[T] =
+    RawRecord[T](new JavaBeanSchema())
+
+  implicit def javaEnumSchema[T <: java.lang.Enum[T]: ClassTag]: Schema[T] =
+    Type[T](FieldType.logicalType(new LogicalType[T, String] {
+      private val clazz = scala.reflect.classTag[T].runtimeClass.asInstanceOf[Class[T]]
+      private val className = clazz.getCanonicalName
+      override def getIdentifier: String = className
+      override def getBaseType: FieldType = FieldType.STRING
+      override def toBaseType(input: T): String = input.name()
+      override def toInputType(base: String): T =
+        java.lang.Enum.valueOf[T](clazz, base)
+      override def toString(): String =
+        s"EnumLogicalType($className, String)"
+    }))
 }
 
 sealed trait Schema[T] {
